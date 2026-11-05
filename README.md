@@ -37,3 +37,29 @@ Then tell Claude "connector added". Claude will test it and add it to the daily 
 - If you rotate the token, update `META_ACCESS_TOKEN` in Vercel and redeploy.
 - To revoke access at any time: delete the system user token in Meta, or delete the Vercel project.
 - Name every Meta ad with its KQ ID first, e.g. `KQ-016 · EN · Range · Proof`, so results match the creative plan.
+
+---
+
+# Shopify connector (read-only, one app per client store)
+
+Endpoint for Claude: `https://<project>.vercel.app/api/shopify/mcp/<MCP_PATH_KEY>` (same key as Meta).
+Tools: list_stores, get_sales_summary (orders, sales, AOV, share over a threshold such as QAR 450, by day and by traffic source), get_product_sales, list_products (prices and stock), run_shopifyql. No write actions exist in the code.
+
+Shopify has not allowed new store-admin "custom apps" since 1 Jan 2026, and client stores sit in the client's own Shopify organisation, so each client store gets its own app in Blusteak's Dev Dashboard, installed once with OAuth. The install gives an offline token that lasts until the app is uninstalled.
+
+## Per store (example: Kendamil, key KENDAMIL)
+1. Dev Dashboard (Blusteak) → Create app "Blu Reports – Kendamil (read-only)".
+   - Version: App URL `https://shopify.dev/apps/default-app-home`, embedded off;
+     scopes `read_orders,read_products,read_inventory,read_reports,read_analytics`;
+     redirect URL `https://<project>.vercel.app/api/shopify/callback`. Release it.
+   - Distribution: Custom distribution → the store's myshopify domain.
+2. Vercel env vars, then redeploy:
+   - `SHOPIFY_KENDAMIL_SHOP` = v8hm6m-gc.myshopify.com
+   - `SHOPIFY_KENDAMIL_CLIENT_ID` and `SHOPIFY_KENDAMIL_CLIENT_SECRET` (app → Settings)
+   - `SHOPIFY_KENDAMIL_LABEL` = Kendamil Qatar (optional)
+3. Open `https://<project>.vercel.app/api/shopify/install?store=kendamil&key=<MCP_PATH_KEY>` while logged in to the store admin → approve the read-only access.
+4. The callback page shows the token once → add it as `SHOPIFY_KENDAMIL_TOKEN` in Vercel → redeploy. Close the page.
+5. claude.ai → Settings → Connectors → Add custom connector → "Blu Shopify" → the endpoint URL above.
+
+Next store: same steps with a new key, e.g. HALWA or MOTHERS.
+Revoke: uninstall the app from the store admin (Settings → Apps).
