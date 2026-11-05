@@ -33,6 +33,19 @@ claude.ai → Settings → Connectors → Add custom connector → Name: "Kendam
 
 Then tell Claude "connector added". Claude will test it and add it to the daily Kendamil scheduled task.
 
+## 5. More clients (Halwa Haweli, Mother's Foods, …) — same project, no new deploy
+All Meta logic lives in `lib/meta.js`. Each client is one set of Vercel env vars plus its own connector URL.
+1. Meta Business Settings → System users → `claude-reader` → Assign assets → the client's ad account → "View performance" only.
+   (If the ad account is in the client's own Business Manager, they first add Blusteak as a partner on it.) The same token then reads it.
+2. Vercel env vars (key = short upper-case client name, e.g. HALWA), then redeploy:
+   - `META_HALWA_AD_ACCOUNT_ID` = act_…
+   - `META_HALWA_LABEL` = Halwa Haweli (optional)
+   - `META_HALWA_ID_EXAMPLE` = HH-012 (optional; the creative ID used in ad names)
+3. Connector URL: `https://<project>.vercel.app/api/meta/halwa/<MCP_PATH_KEY>` → add in Claude as "Halwa Meta Ads".
+
+Kendamil works on both `/api/mcp/<MCP_PATH_KEY>` (the original URL) and `/api/meta/kendamil/<MCP_PATH_KEY>`, using the original `META_AD_ACCOUNT_ID`.
+In ChatGPT: Settings → Apps/Connectors → Create → paste the same URL, Authentication "No authentication" (the secret key in the URL is the protection).
+
 ## Notes
 - If you rotate the token, update `META_ACCESS_TOKEN` in Vercel and redeploy.
 - To revoke access at any time: delete the system user token in Meta, or delete the Vercel project.
