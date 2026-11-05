@@ -1,0 +1,7 @@
+{
+  "name": "kendamil-meta-ads-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Read-only Meta Ads MCP connector for the Kendamil Qatar ad account (Vercel).",
+  "engines": { "node": ">=18" }
+}
