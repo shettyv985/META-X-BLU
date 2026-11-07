@@ -77,6 +77,6 @@ Shopify has not allowed new store-admin "custom apps" since 1 Jan 2026, and clie
 Next store: same steps with a new key, e.g. HALWA or MOTHERS.
 
 One-store connector (can only read that store, e.g. for a client's own daily task):
-`https://<project>.vercel.app/api/shopify/mcp/<store>/<MCP_PATH_KEY>`, e.g. `/api/shopify/mcp/halwa/<key>`.
+`https://<project>.vercel.app/api/shopify/store/<store>/<MCP_PATH_KEY>`, e.g. `/api/shopify/store/halwa/<key>`.
 Its tools have no `store` argument and list_stores shows only that store. The all-stores URL above is unchanged.
 Revoke: uninstall the app from the store admin (Settings → Apps).
