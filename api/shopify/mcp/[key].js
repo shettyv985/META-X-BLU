@@ -72,9 +72,21 @@ async function fetchOrders(st, since, until, max = 2500) {
 const money = x => Number((x && x.shopMoney && x.shopMoney.amount) || 0);
 const r2 = n => Math.round(n * 100) / 100;
 
-async function callTool(name, a = {}) {
+// locked = store key when the URL is /api/shopify/mcp/<store>/<key>: only that store can be read.
+function lockedTools(st) {
+  return TOOLS.filter(t => t.name !== "list_stores").map(t => {
+    const props = { ...t.inputSchema.properties }; delete props.store;
+    const req = (t.inputSchema.required || []).filter(r => r !== "store");
+    const schema = { type: "object", properties: props }; if (req.length) schema.required = req;
+    return { ...t, description: `${st.label}: ${t.description}`, inputSchema: schema };
+  });
+}
+
+async function callTool(name, a = {}, locked) {
+  if (locked) a = { ...a, store: locked };
   if (name === "list_stores") {
-    return { stores: storeKeys().map(k => { const s = store(k); return { store: s.key, label: s.label, shop: s.shop, installed: !!s.token }; }) };
+    const keys = locked ? [locked] : storeKeys();
+    return { stores: keys.map(k => { const s = store(k); return { store: s.key, label: s.label, shop: s.shop, installed: !!s.token }; }) };
   }
   const st = store(a.store);
   if (name === "get_sales_summary") {
@@ -132,21 +144,23 @@ async function callTool(name, a = {}) {
 const ok = (id, result) => ({ jsonrpc: "2.0", id, result });
 const err = (id, code, message) => ({ jsonrpc: "2.0", id, error: { code, message } });
 
-async function handleMessage(m) {
+async function handleMessage(m, locked) {
   const { id, method, params } = m || {};
   if (id === undefined || id === null) return null;
+  const st = locked ? store(locked) : null;
   if (method === "initialize") {
     const v = params && params.protocolVersion;
-    return ok(id, { protocolVersion: PROTOCOL_VERSIONS.includes(v) ? v : PROTOCOL_VERSIONS[0], capabilities: { tools: { listChanged: false } }, serverInfo: SERVER_INFO,
-      instructions: "Read-only Shopify data for Blusteak's client stores. Call list_stores first, then pass store to the other tools." });
+    return ok(id, { protocolVersion: PROTOCOL_VERSIONS.includes(v) ? v : PROTOCOL_VERSIONS[0], capabilities: { tools: { listChanged: false } },
+      serverInfo: st ? { name: `${st.key}-shopify`, version: SERVER_INFO.version } : SERVER_INFO,
+      instructions: st ? `Read-only Shopify data for ${st.label} (${st.shop}) only.` : "Read-only Shopify data for Blusteak's client stores. Call list_stores first, then pass store to the other tools." });
   }
   if (method === "ping") return ok(id, {});
-  if (method === "tools/list") return ok(id, { tools: TOOLS });
+  if (method === "tools/list") return ok(id, { tools: st ? lockedTools(st) : TOOLS });
   if (method === "resources/list") return ok(id, { resources: [] });
   if (method === "prompts/list") return ok(id, { prompts: [] });
   if (method === "tools/call") {
     try {
-      const out = await callTool(params && params.name, (params && params.arguments) || {});
+      const out = await callTool(params && params.name, (params && params.arguments) || {}, locked);
       return ok(id, { content: [{ type: "text", text: JSON.stringify(out) }], structuredContent: out, isError: false });
     } catch (e) { return ok(id, { content: [{ type: "text", text: String(e.message || e) }], isError: true }); }
   }
@@ -159,17 +173,24 @@ async function readBody(req) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "null");
 }
 
-module.exports = async function handler(req, res) {
+async function serve(req, res, locked) {
   const expected = process.env.MCP_PATH_KEY;
   if (!expected || !safeEqual((req.query && req.query.key) || "", expected)) { res.statusCode = 404; return res.end("Not found"); }
+  if (locked) {
+    try { locked = store(locked).key; } catch { res.statusCode = 404; return res.end("Not found"); }
+  }
   if (req.method === "DELETE") { res.statusCode = 200; return res.end(); }
   if (req.method !== "POST") { res.statusCode = 405; res.setHeader("Allow", "POST"); return res.end(); }
   let body;
   try { body = await readBody(req); } catch { res.statusCode = 400; return res.end(JSON.stringify(err(null, -32700, "Parse error"))); }
   const batch = Array.isArray(body);
-  const replies = (await Promise.all((batch ? body : [body]).map(handleMessage))).filter(Boolean);
+  const replies = (await Promise.all((batch ? body : [body]).map(m => handleMessage(m, locked)))).filter(Boolean);
   if (!replies.length) { res.statusCode = 202; return res.end(); }
   res.statusCode = 200; res.setHeader("Content-Type", "application/json");
   res.end(JSON.stringify(batch ? replies : replies[0]));
-};
+}
+
+// All stores: /api/shopify/mcp/<MCP_PATH_KEY>
+module.exports = function handler(req, res) { return serve(req, res, null); };
+module.exports.serve = serve;
 module.exports._internal = { handleMessage, callTool };
