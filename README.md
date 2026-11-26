@@ -80,3 +80,16 @@ One-store connector (can only read that store, e.g. for a client's own daily tas
 `https://<project>.vercel.app/api/shopify/store/<store>/<MCP_PATH_KEY>`, e.g. `/api/shopify/store/halwa/<key>`.
 Its tools have no `store` argument and list_stores shows only that store. The all-stores URL above is unchanged.
 Revoke: uninstall the app from the store admin (Settings → Apps).
+
+
+## Google Analytics 4 (read-only)
+
+URL: `https://blu-x-data.vercel.app/api/ga/<client>/<MCP_PATH_KEY>`
+
+Shared env: `GA_SA_KEY_JSON` = the JSON key of service account `blu-ga-reader@blu-x-data.iam.gserviceaccount.com` (Google Cloud project `blu-x-data`, owned by analytics@blusteak.com).
+
+Per client: `GA_<KEY>_PROPERTY_ID` (numeric GA4 property ID) and optional `GA_<KEY>_LABEL`.
+
+To add a client: in GA4 → Admin → Property access management, add the service account email as **Viewer**, then add the two env vars and redeploy.
+
+Tools: get_overview, get_breakdown (channel, source_medium, campaign, page, landing_page, country, city, device, new_vs_returning, event, product, date), get_realtime, run_report.
